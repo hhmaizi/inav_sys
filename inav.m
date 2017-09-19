@@ -19,11 +19,18 @@
 % for more info see ch6.1, pp21 "an introduction to inertial navigation"
 % from Oliver J. Woodman
 % I need a test for direction cosine matrix
-navState.p = zeros(3,1);
-navState.v = zeros(3,1); % should I change this?
+navState.pg = zeros(3,1);
+navState.vg = zeros(3,1); % should I change this?
 navState.q = [1, 0, 0, 0];
-navState.a = []; % raw data
+navState.ab = []; % raw data
 navState.omega = []; % raw data
+
+quats = quatIntRK4(navState.q, );
+C_gb = quat2dcm(quats);
+navState.ag = C_gb * navState.ab;
+
+navState.vg = vg + dt*(ag -g);
+sg = sg + dt*vg
 
 %% acc local integration, later try global integration.
 function [txl, tyl, tzl] = accIntLinear(acc, dt)
@@ -65,9 +72,10 @@ end
 
 %% convert angular vel to skew matrix
 function omegaSkew = toSkewmat44(omega)
-    omegaSkew = [0.0,      -omega(1), -omega(2), -omega(3);...
-                 omega(1),  0.0,       omega(3), -omega(2);...
-                 omega(2), -omega(3),  0.0,       omega(1);...
-                 omega(3), omega(2),  -mega(1),  0.0];    
+    depth = size(omega, 3);
+    omegaSkew = [zeros(1,1,depth),      -omega(1,1,:), -omega(2,1,:), -omega(3,1,:);...
+                 omega(1,1,:),  0.0,       omega(3,1,:), -omega(2,1,:);...
+                 omega(2,1,:), -omega(3,1,:),  0.0,       omega(1,1,:);...
+                 omega(3,1,:), omega(2,1,:),  -omega(1,1,:),  0.0];    
 end
 
