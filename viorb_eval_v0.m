@@ -1,8 +1,14 @@
 %clc
-%clear all
+clear all
 % close all
 %% read the data
 % viorb_readdata;
+%% params
+Tbc = [0.0148655429818, -0.999880929698, 0.00414029679422, -0.0216401454975,
+         0.999557249008, 0.0149672133247, 0.025715529948, -0.064676986768,
+        -0.0257744366974, 0.00375618835797, 0.999660727178, 0.00981073058949,
+         0.0, 0.0, 0.0, 1.0];
+
 %%
 path_data = '\\10.10.194.34\foaa\Teddy_Zhang\tmp\inav_analysis\test0929\'; % #timestamp p_RS_R_x  p_RS_R_y p_RS_R_z q_RS_w q_RS_x q_RS_y q_RS_z v_RS_R_x v_RS_R_y v_RS_R_z
 filenames_slam = {'M01_FT_VI.txt', 'M03_FT_VI.txt', 'V103_FT_VI.txt', 'V203_FT_VI.txt'};
@@ -80,21 +86,39 @@ quat_cam_slam = quat_slam_bak ;
 % quat_cam_slam = quatconj(quat_slam_bak);
 pos_cam_slam = data_slam(:, 2:4); % cam0 not body
 
-%% params
-Tbc = [0.0148655429818, -0.999880929698, 0.00414029679422, -0.0216401454975,
-         0.999557249008, 0.0149672133247, 0.025715529948, -0.064676986768,
-        -0.0257744366974, 0.00375618835797, 0.999660727178, 0.00981073058949,
-         0.0, 0.0, 0.0, 1.0];
+%% align slam to ground truth
+Rsc = quat2dcm(quat_cam_slam);
+vcb_slam = zeros(size(pos_cam_slam));
+for idx = 1:length(pos_cam_slam)
+    vcb_slam(idx,:) = ( Rsc(:,:,idx) * (-Tbc(1:3, 1:3)' * Tbc(1:3,4)) )';
+end
+pos_body_slam = pos_cam_slam + vcb_slam;
+pos_body_B0 = Tbc(1:3,1:3) * pos_body_slam' + Tbc(1:3,4);
+pos_Ref = quat2dcm(quat_gd(1,:)) * pos_body_B0 + pos_gd(1,:)';
+pos_Ref = quat2dcm(quatconj(quat_gd(1,:))) * pos_body_B0 + pos_gd(1,:)';
+pos_Ref = pos_Ref';
+
+%% line2show 1, 2, 3
+line2show = 3;
+figure;
+plot(data_slam(:,1), pos_Ref(:,line2show)); hold on
+plot(data_slam(:,1), pos_gd(:,line2show), 'r'); hold off
+legend('body from slam', 'body from ground truth')
+%% transformation procedure
+figure;
+plot(data_slam(:,1), pos_cam_slam(:,line2show)); hold on
+plot(data_slam(:,1), pos_slam(:,line2show), 'r');
+
 
 %%
 [pos_slam, quat_slam] = body_in_slam(pos_cam_slam, quat_cam_slam);% get body(imu) position from cam0 position
 slam2RefFrame
 
 %% raw data plotting
-raw_plot
+% raw_plot
 
 %% position plotting
 pos_viorb_plot
 %% attitude plotting
-att_viorb_plot
+% att_viorb_plot
 %%
