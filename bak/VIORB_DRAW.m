@@ -63,6 +63,7 @@ for i=1:1:length(slam(:,1))
     slam_worldimu(end,:)=slam_worldimu(end,:)+pci;
     slam_worldimu(end,:)=quatrotate(quatconj(qiw), slam_worldimu(end,:))+piw;
 end
+
 for i=1:1:length(slam(:,1))
     slam_quat(end+1,:)=quatmultiply(qiw,quatmultiply(qci,quatmultiply(slam(i,5:8),quatconj(qci))));
 end

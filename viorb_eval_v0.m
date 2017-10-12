@@ -1,6 +1,6 @@
 %clc
 clear all
-% close all
+close all
 %% read the data
 % viorb_readdata;
 %% params
@@ -86,15 +86,38 @@ quat_cam_slam = quat_slam_bak ;
 % quat_cam_slam = quatconj(quat_slam_bak);
 pos_cam_slam = data_slam(:, 2:4); % cam0 not body
 
+%% attitude alignment
+quat_rb_slam = dcm2quat(Rrb_slam);
+Rrb_gd = quat2dcm( quat_gd );
+Rdiff = zeros(size(Rrb_slam)); quat_diff = zeros(size(quat_rb_slam));
+for idx = 1 : length(Rrb_slam)
+    Rdiff(:,:,idx) = Rrb_gd(:, :, idx) * Rrb_slam(:, :, idx)';
+    quat_diff(idx,:) = quatdivide(quat_rb_slam(idx, :), quatconj(quat_gd(idx, :)));
+end
+%% attitude conversion
+% quat_diff = dcm2quat(Rdiff);
+Rdiff_quat = quat2dcm(quat_diff);
+[anz_gd, any_gd, anx_gd] = quat2angle(quatconj(quat_gd));
+[anz_slam, any_slam, anx_slam] = quat2angle(quatnormalize(quat_cam_slam));
+[anz_rb_slam, any_rb_slam, anx_rb_slam] = quat2angle(quatnormalize(quat_rb_slam));
+%%
+[anz_diff, any_diff, anx_diff] = quat2angle(quat_diff);
+figure; plot(anz_diff, 'r');hold on
+plot(any_diff, 'g');plot(anx_diff, 'b');
+%%
+att_viorb_plot
+
 %% align slam to ground truth
 Rsc = quat2dcm(quat_cam_slam);
+Rrb_slam = zeros(size(Rsc));
 vcb_slam = zeros(size(pos_cam_slam));
 for idx = 1:length(pos_cam_slam)
     vcb_slam(idx,:) = ( Rsc(:,:,idx) * (-Tbc(1:3, 1:3)' * Tbc(1:3,4)) )';
+    Rrb_slam(:, :, idx) = quat2dcm(quatconj(quat_gd(1,:))) * Tbc(1:3, 1:3) * Rsc(:,:,idx) * Tbc(1:3, 1:3)';    
 end
 pos_body_slam = pos_cam_slam + vcb_slam;
 pos_body_B0 = Tbc(1:3,1:3) * pos_body_slam' + Tbc(1:3,4);
-pos_Ref = quat2dcm(quat_gd(1,:)) * pos_body_B0 + pos_gd(1,:)';
+% pos_Ref = quat2dcm(quat_gd(1,:)) * pos_body_B0 + pos_gd(1,:)';
 pos_Ref = quat2dcm(quatconj(quat_gd(1,:))) * pos_body_B0 + pos_gd(1,:)';
 pos_Ref = pos_Ref';
 
@@ -120,5 +143,5 @@ slam2RefFrame
 %% position plotting
 pos_viorb_plot
 %% attitude plotting
-% att_viorb_plot
+att_viorb_plot
 %%
