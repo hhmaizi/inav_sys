@@ -1,5 +1,4 @@
-# inav_sys
-inertial navigation system matlab toolbox
+# evaluate stereo viorb
 ## terminologies
 ### direction cosine matrix:
 % the direction matrix approach.

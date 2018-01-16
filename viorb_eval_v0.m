@@ -1,34 +1,32 @@
 %clc
 clear all
 close all
-%% read the data
+%% read the data from script
 % viorb_readdata;
-%% params
+%% params: cam frame to imu frame transformation
 Tbc = [0.0148655429818, -0.999880929698, 0.00414029679422, -0.0216401454975,
          0.999557249008, 0.0149672133247, 0.025715529948, -0.064676986768,
         -0.0257744366974, 0.00375618835797, 0.999660727178, 0.00981073058949,
          0.0, 0.0, 0.0, 1.0];
 
-%%
+%% read the data directly
 path_data = '\\10.10.194.34\foaa\Teddy_Zhang\tmp\inav_analysis\test0929\'; % #timestamp p_RS_R_x  p_RS_R_y p_RS_R_z q_RS_w q_RS_x q_RS_y q_RS_z v_RS_R_x v_RS_R_y v_RS_R_z
 filenames_slam = {'M01_FT_VI.txt', 'M03_FT_VI.txt', 'V103_FT_VI.txt', 'V203_FT_VI.txt'};
 
 data_gtruth = load('mh01_groundtruth.csv');
 % data_slam = load([path_data, filenames_slam{1}]);
 data_slam = load('.\data\mh01.txt');
-
 % find data_imu index where imu track only starts.
 
 %% find corresponding ground truth timestamp to data_slam 
-% assuming data_slam's timestamp starts somewhere from ground truth
-% timestamp. 
-% check timestamp
-% ground truth ends before slam.
-% manually make slam ends before ground truth. thrshhold 3.0e+09 nano sec
-data_slam = data_slam(1: end - 3*20,:); % assuming slam frequency 20hz
-% 
-denom_timestamp = 1.0e+09 * (60 * 60 * 24 * 365);
+% data_slam's timestamp should starts somewhere from ground truth.
+% check timestamp, ground truth ends before slam.
+% manually make slam ends before ground truth. thresh hold 3.0e+09 nano sec
+data_slam = data_slam(1: end - 3*20,:); % cut 3 seconds data from slam, assuming slam frequency 20hz
+denom_timestamp = 1.0e+09 * (60 * 60 * 24 * 365); % nano secs per year.
 yearsince1972 = data_gtruth(1,1)/denom_timestamp;
+% slam timestamp and groundtruth timestamp shouldn't diff more than 1 year.
+% maybe one hour for later implementation.
 if (data_slam(1,1)/denom_timestamp < yearsince1972 - 1 || ...
        data_slam(1,1)/denom_timestamp > yearsince1972 + 1 )
    disp 'check your data timestamp'
@@ -45,7 +43,7 @@ elseif ( (data_slam(1,1) - data_gtruth(1,1) > 300.0e+09))
     return
 end
 
-% time align ment
+% time alignment
 idx_gtruth4slam = [];
 time_diff_gtruth4slam = [];
 idx_bad4slam = [];
@@ -71,11 +69,6 @@ data_gtruth4slam = data_gtruth(idx_gtruth4slam, 1:8);
 data_slam(:,1) = (data_slam(:,1) - data_slam(1,1)) * 1.0e-09;
 data_gtruth4slam(:,1) = (data_gtruth4slam(:,1) - data_gtruth4slam(1,1)) * 1.0e-09;
 % data_gtruth4slam(1,1) - data_gtruth4slam(end,1)
-%% 
-% figure
-% histogram(data_gtruth4slam(:,1) - data_slam(:,1))
-
-%% position and attitude alignments
 
 %% transform slam to Reference frame
 % preparing the raw data
@@ -100,18 +93,18 @@ pos_body_B0 = Tbc(1:3,1:3) * pos_body_slam' + Tbc(1:3,4);
 pos_Ref = quat2dcm(quatconj(quat_gd(1,:))) * pos_body_B0 + pos_gd(1,:)';
 pos_Ref = pos_Ref';
 
-%% body pose comparing. slam VS ground truth.  
+%% body position comparing. slam VS ground truth.  
 % line2show 1, 2, 3
 line2show = 1;
 figure;
 plot(data_slam(:,1), pos_Ref(:,line2show)); hold on
 plot(data_slam(:,1), pos_gd(:,line2show), 'r'); hold off
+title('body position error--slam to ground truth')
 legend('body from slam', 'body from ground truth')
 %% transformation procedure
-figure;
-plot(data_slam(:,1), pos_cam_slam(:,line2show)); hold on
-plot(data_slam(:,1), pos_body_slam(:,line2show), 'r');
-%%
+% figure;
+% plot(data_slam(:,1), pos_cam_slam(:,line2show)); hold on
+% plot(data_slam(:,1), pos_body_slam(:,line2show), 'r');
 %% attitude alignment
 quat_rb_slam = dcm2quat(Rrb_slam);
 Rrb_gd = quat2dcm( quat_gd );
@@ -120,22 +113,36 @@ for idx = 1 : length(Rrb_slam)
     Rdiff(:,:,idx) = Rrb_gd(:, :, idx) * Rrb_slam(:, :, idx)';
     quat_diff(idx,:) = quatdivide(quat_rb_slam(idx, :), quatconj(quat_gd(idx, :)));
 end
-%% attitude conversion
+% attitude conversion
 % quat_diff = dcm2quat(Rdiff);
 Rdiff_quat = quat2dcm(quat_diff);
 [anz_gd, any_gd, anx_gd] = quat2angle(quatconj(quat_gd));
 [anz_slam, any_slam, anx_slam] = quat2angle(quatnormalize(quat_cam_slam));
 [anz_rb_slam, any_rb_slam, anx_rb_slam] = quat2angle(quatnormalize(quat_rb_slam));
-%%
-[anz_diff, any_diff, anx_diff] = quat2angle(quat_diff);
-figure; plot(anz_diff, 'r');hold on
-plot(any_diff, 'g');plot(anx_diff, 'b');
-title('euler angle error, unit rad')
-legend('angz','angy', 'angx' )
-%%
-att_viorb_plot
-%% comparing attitude
-%% plotting attitude comparing
+
+%% attitude from slam and ground truth
+figure
+subplot(3,1,1)
+plot(data_gtruth4slam(:,1), anz_gd(:), 'r')
+hold on
+plot(data_gtruth4slam(:,1), any_gd(:), 'g')
+plot(data_gtruth4slam(:,1), anx_gd(:), 'b')
+title('body ground truth Ref')
+subplot(3,1,2)
+plot(data_slam(:,1), anz_rb_slam, 'r')
+hold on
+plot(data_slam(:,1), any_rb_slam, 'g')
+plot(data_slam(:,1), anx_rb_slam, 'b')
+title('slam body aligned to Ref')
+subplot(3,1,3)
+plot(data_slam(:,1), anz_slam, 'r')
+hold on
+plot(data_slam(:,1), any_slam, 'g')
+plot(data_slam(:,1), anx_slam, 'b')
+title('slam cam unaligned')
+hold off
+suptitle('attitudes ground truth, slam body, and slam cam')
+% comparing attitude between slam's body and ground truth.
 figure
 subplot(3,1,1)
 plot(data_gtruth4slam(:,1), anz_gd(:), 'r')
@@ -153,40 +160,27 @@ hold on
 plot(data_slam(:,1), anx_rb_slam, 'b')
 title('anx gd and slam')
 hold off
-
-%% plotting attitude diff
-anz_diff = anz_gd(:) - anz_rb_slam;
-any_diff = any_gd(:) - any_rb_slam;
-anx_diff = anx_gd(:) - anx_rb_slam;
-figure
-subplot(3,1,1)
-plot(data_gtruth4slam(:,1), anz_diff)
-title('anz diff gd and slam')
-subplot(3,1,2)
-plot(data_gtruth4slam(:,1), any_diff)
-title('any diff gd and slam')
-subplot(3,1,3)
-plot(data_gtruth4slam(:,1), anx_diff)
-title('anx diff gd and slam')
-hold off
+%% attitude error plotting
+% anz_diff = anz_gd(:) - anz_rb_slam;
+% any_diff = any_gd(:) - any_rb_slam;
+% anx_diff = anx_gd(:) - anx_rb_slam;
+% figure
+% subplot(3,1,1)
+% plot(data_gtruth4slam(:,1), anz_diff)
+% title('anz diff gd and slam')
+% subplot(3,1,2)
+% plot(data_gtruth4slam(:,1), any_diff)
+% title('any diff gd and slam')
+% subplot(3,1,3)
+% plot(data_gtruth4slam(:,1), anx_diff)
+% title('anx diff gd and slam')
+% hold off
+%
 %% diff statistics
-figure
-subplot(3,1,1)
-histogram(anz_diff)
-subplot(3,1,2)
-histogram(any_diff)
-subplot(3,1,3)
-histogram(anx_diff)
-
-%%
-[pos_slam, quat_slam] = body_in_slam(pos_cam_slam, quat_cam_slam);% get body(imu) position from cam0 position
-slam2RefFrame
-
-%% raw data plotting
-% raw_plot
-
-%% position plotting
-pos_viorb_plot
-%% attitude plotting
-att_viorb_plot
-%%
+% figure
+% subplot(3,1,1)
+% histogram(anz_diff)
+% subplot(3,1,2)
+% histogram(any_diff)
+% subplot(3,1,3)
+% histogram(anx_diff)

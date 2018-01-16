@@ -26,6 +26,8 @@ octave-workspace
 # jpg
 .jpg
 # folder
+1023/
+bak/
 data/
 tests/
 figs/
