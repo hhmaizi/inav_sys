@@ -20,6 +20,7 @@ plot(data_slam(:,1), any_slam, 'g')
 plot(data_slam(:,1), anx_slam, 'b')
 title('slam cam unaligned')
 hold off
+suptitle('attitudes plotting')
 
 %% abs plotting
 

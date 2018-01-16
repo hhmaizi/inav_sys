@@ -20,3 +20,14 @@ octave-workspace
 
 # Simulink autosave extension
 .autosave
+
+# csv 
+.csv
+# jpg
+.jpg
+# folder
+data/
+tests/
+figs/
+tests_data/
+/1023

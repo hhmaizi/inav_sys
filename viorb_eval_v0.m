@@ -82,10 +82,36 @@ data_gtruth4slam(:,1) = (data_gtruth4slam(:,1) - data_gtruth4slam(1,1)) * 1.0e-0
 quat_gd = data_gtruth4slam(:, 5:8);
 pos_gd = data_gtruth4slam(:,2:4);
 quat_slam_bak = data_slam(:, 5:8); % body(imu) not cam0
-quat_cam_slam = quat_slam_bak ;
-% quat_cam_slam = quatconj(quat_slam_bak);
+% quat_cam_slam = quat_slam_bak ;
+quat_cam_slam = quatconj(quat_slam_bak);
 pos_cam_slam = data_slam(:, 2:4); % cam0 not body
 
+%% align slam to ground truth
+Rsc = quat2dcm(quat_cam_slam);
+Rrb_slam = zeros(size(Rsc));
+vcb_slam = zeros(size(pos_cam_slam));
+for idx = 1:length(pos_cam_slam)
+    vcb_slam(idx,:) = ( Rsc(:,:,idx) * (-Tbc(1:3, 1:3)' * Tbc(1:3,4)) )';
+    Rrb_slam(:, :, idx) = quat2dcm(quatconj(quat_gd(1,:))) * Tbc(1:3, 1:3) * Rsc(:,:,idx) * Tbc(1:3, 1:3)';    
+end
+pos_body_slam = pos_cam_slam + vcb_slam;
+pos_body_B0 = Tbc(1:3,1:3) * pos_body_slam' + Tbc(1:3,4);
+% pos_Ref = quat2dcm(quat_gd(1,:)) * pos_body_B0 + pos_gd(1,:)';
+pos_Ref = quat2dcm(quatconj(quat_gd(1,:))) * pos_body_B0 + pos_gd(1,:)';
+pos_Ref = pos_Ref';
+
+%% body pose comparing. slam VS ground truth.  
+% line2show 1, 2, 3
+line2show = 1;
+figure;
+plot(data_slam(:,1), pos_Ref(:,line2show)); hold on
+plot(data_slam(:,1), pos_gd(:,line2show), 'r'); hold off
+legend('body from slam', 'body from ground truth')
+%% transformation procedure
+figure;
+plot(data_slam(:,1), pos_cam_slam(:,line2show)); hold on
+plot(data_slam(:,1), pos_body_slam(:,line2show), 'r');
+%%
 %% attitude alignment
 quat_rb_slam = dcm2quat(Rrb_slam);
 Rrb_gd = quat2dcm( quat_gd );
@@ -104,34 +130,53 @@ Rdiff_quat = quat2dcm(quat_diff);
 [anz_diff, any_diff, anx_diff] = quat2angle(quat_diff);
 figure; plot(anz_diff, 'r');hold on
 plot(any_diff, 'g');plot(anx_diff, 'b');
+title('euler angle error, unit rad')
+legend('angz','angy', 'angx' )
 %%
 att_viorb_plot
+%% comparing attitude
+%% plotting attitude comparing
+figure
+subplot(3,1,1)
+plot(data_gtruth4slam(:,1), anz_gd(:), 'r')
+hold on
+plot(data_slam(:,1), anz_rb_slam, 'b')
+title('anz gd and slam')
+subplot(3,1,2)
+plot(data_gtruth4slam(:,1), any_gd(:), 'r')
+hold on
+plot(data_slam(:,1), any_rb_slam, 'b')
+title('any gd and slam')
+subplot(3,1,3)
+plot(data_gtruth4slam(:,1), anx_gd(:), 'r')
+hold on
+plot(data_slam(:,1), anx_rb_slam, 'b')
+title('anx gd and slam')
+hold off
 
-%% align slam to ground truth
-Rsc = quat2dcm(quat_cam_slam);
-Rrb_slam = zeros(size(Rsc));
-vcb_slam = zeros(size(pos_cam_slam));
-for idx = 1:length(pos_cam_slam)
-    vcb_slam(idx,:) = ( Rsc(:,:,idx) * (-Tbc(1:3, 1:3)' * Tbc(1:3,4)) )';
-    Rrb_slam(:, :, idx) = quat2dcm(quatconj(quat_gd(1,:))) * Tbc(1:3, 1:3) * Rsc(:,:,idx) * Tbc(1:3, 1:3)';    
-end
-pos_body_slam = pos_cam_slam + vcb_slam;
-pos_body_B0 = Tbc(1:3,1:3) * pos_body_slam' + Tbc(1:3,4);
-% pos_Ref = quat2dcm(quat_gd(1,:)) * pos_body_B0 + pos_gd(1,:)';
-pos_Ref = quat2dcm(quatconj(quat_gd(1,:))) * pos_body_B0 + pos_gd(1,:)';
-pos_Ref = pos_Ref';
-
-%% line2show 1, 2, 3
-line2show = 3;
-figure;
-plot(data_slam(:,1), pos_Ref(:,line2show)); hold on
-plot(data_slam(:,1), pos_gd(:,line2show), 'r'); hold off
-legend('body from slam', 'body from ground truth')
-%% transformation procedure
-figure;
-plot(data_slam(:,1), pos_cam_slam(:,line2show)); hold on
-plot(data_slam(:,1), pos_slam(:,line2show), 'r');
-
+%% plotting attitude diff
+anz_diff = anz_gd(:) - anz_rb_slam;
+any_diff = any_gd(:) - any_rb_slam;
+anx_diff = anx_gd(:) - anx_rb_slam;
+figure
+subplot(3,1,1)
+plot(data_gtruth4slam(:,1), anz_diff)
+title('anz diff gd and slam')
+subplot(3,1,2)
+plot(data_gtruth4slam(:,1), any_diff)
+title('any diff gd and slam')
+subplot(3,1,3)
+plot(data_gtruth4slam(:,1), anx_diff)
+title('anx diff gd and slam')
+hold off
+%% diff statistics
+figure
+subplot(3,1,1)
+histogram(anz_diff)
+subplot(3,1,2)
+histogram(any_diff)
+subplot(3,1,3)
+histogram(anx_diff)
 
 %%
 [pos_slam, quat_slam] = body_in_slam(pos_cam_slam, quat_cam_slam);% get body(imu) position from cam0 position
